@@ -2,11 +2,11 @@ import axios from "axios";
 import { api } from "../protocol/client.js";
 
 function normalizeArgs(fnMeta: any, rawArgs: Record<string, any> = {}): any {
-  if (!fnMeta || !Array.isArray(fnMeta.params) || fnMeta.params.length === 0) {
+  const params = fnMeta?.signature?.args;
+  if (!Array.isArray(params) || params.length === 0) {
     return rawArgs;
   }
 
-  const { params } = fnMeta;
   const paramNames = params.map((p: any) => p.name);
   const rawKeys = Object.keys(rawArgs);
 
@@ -38,8 +38,9 @@ export async function invokeDeploymentFunction(
 
   const { prefix, version } = deployment;
 
-  const fnMeta = (deployment.packages || [])
-    .flatMap((pkg: any) => pkg.functions || [])
+  const allHandles = Object.values(deployment.packages || {}).flat();
+  const fnMeta = allHandles
+    .flatMap((handle: any) => handle.scope?.funcs || [])
     .find((fn: any) => fn.name === functionName);
 
   const payload = normalizeArgs(fnMeta, args ?? {});
@@ -47,7 +48,7 @@ export async function invokeDeploymentFunction(
   const url = `https://api.metacall.io/${prefix}/${suffix}/${version}/${type}/${functionName}`;
 
   try {
-    const isGen = Boolean(fnMeta?.isGenerator);
+    const isGen = Boolean(fnMeta?.isGenerator || fnMeta?.async);
     const response = await axios.post(url, payload, {
       headers: {
         Authorization: `jwt ${process.env.METACALL_TOKEN}`
